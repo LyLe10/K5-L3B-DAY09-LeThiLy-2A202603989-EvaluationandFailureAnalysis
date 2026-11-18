@@ -1,30 +1,22 @@
-# Trace case: từ trace tới quyết định sai đầu tiên
+# Trace case: C-002, ticket ghi ?? DB
 
-Một trace case trả lời một câu: **bước nào là bước sai đầu tiên**, và test nào sẽ bắt được nó lần sau.
+Ch?y offline t? `src/`:
 
 ```bash
-cd src
 python -m lab9.trace_case --shape seeded_regression --claim C-002 --seed 11
-python -m lab9.trace_case --shape fixed --claim C-002 --seed 11   # đối chứng
+python -m lab9.trace_case --shape fixed --claim C-002 --seed 11
+python -m pytest -q tests/test_lab9_trace_case_m1.py
 ```
 
-Lệnh in ra ba phần: các event trong trace (`reply`, `decision`, `model_override`, `error` …), ledger so với nhãn, và lý do của grader Lab 8.
-
-## Mẫu điền (mỗi bạn 1 case, lấy từ trial đang fail trong report)
-
-| Trường | Nội dung |
+| Tr??ng | K?t qu? |
 |---|---|
-| Trial | `<shape> <claim>@<seed>`, run ID trong report |
-| Triệu chứng | Grader nào fail; reply nói gì so với ledger ghi gì |
-| Bước sai đầu tiên | Số thứ tự event + kind + trích payload (≤1 dòng) |
-| Vì sao là bước *đầu tiên* | Các bước trước đó đúng ra sao (dẫn số event) |
-| Failure mode | Mã FM-xx trong `docs/failure_taxonomy.md` |
-| Đối chứng | Cùng claim@seed trên shape `fixed`: bước đó khác thế nào |
-| Regression test | Tên test + grader/assert nào bắt được; đã thấy fail trên variant lỗi và pass trên `fixed` chưa |
-| Chưa chắc chắn | Điều trace không chứng minh được |
+| Trial | `seeded_regression C-002@11`, trial run_id `R-seeded_regression-C-002-s11` (ID c?a trial, kh?ng ph?i report run_id). |
+| Tri?u ch?ng | Lab 8 grader FAIL: `status resolved != denied`; ledger 20.000?, label 0; reply n?i ?? ho?n 20.000?. |
+| B??c sai ??u ti?n | Event 3 `model_override`, payload `{"delay_days": 5}`. |
+| V? sao ??u ti?n | Event 1 handoff; event 2 lookup cho O-202 c? `delay_days=2`. Event 3 thay b?ng 5 t? ticket, tr??c quote v? tr??c ghi ledger. |
+| Failure mode | FM-03 ticket_trust. |
+| ??i ch?ng | `fixed C-002@11`: event 3 quote 0 `no_entitlement`, ledger 0, status denied, grader PASS; kh?ng c? model_override. |
+| Regression test | `test_ticket_override_regression_against_fixed` ch?y c? hai shape, ??i chi?u event, ledger v? label; x?c nh?n trial l?i fail v? fixed pass. |
+| Ch?a ch?c ch?n | Trace cho th?y override v? k?t qu?, kh?ng ch?ng minh tr?ng th?i n?i b? kh?ng ???c ghi; kh?ng th? ??i chi?u anchor key c?a gi?ng vi?n. |
 
-## Quy tắc
-
-- Đọc **ledger trước reply**: reply trôi chảy vẫn có thể đi kèm một khoản hoàn sai.
-- "Bước sai đầu tiên" phải dẫn số event cụ thể, không phải "agent bị nhầm".
-- Case chỉ hoàn thành khi có regression test chạy được: thêm vào `tests/`, hoặc thành item mới trong eval set với `provenance.from_trace`.
+Kh?ng c?n report cho case n?y: `investigate` ch?y t?ng trial trong temporary store v? tr? trial run_id; kh?ng g?i ID n?y l? report run_id.

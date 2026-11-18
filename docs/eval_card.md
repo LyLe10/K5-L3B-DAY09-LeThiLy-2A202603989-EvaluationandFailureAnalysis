@@ -19,7 +19,7 @@ Paired bootstrap 95%, percentile, 1.000 resamples, seed 2027, đơn vị tái l�
 
 Judge tone replay: κ=0.757, P=0.857, R=0.800 đạt floors; helpful κ=0.375, P=1.000, R=0.300 không được dùng gate. Xem `docs/judge_audit.md`. Trace case và regression test: `docs/trace_case.md`.
 
-**Giới hạn:** MockLLM và dữ liệu public không đại diện traffic hay model thật; 14 item làm CI rộng; judge replay chưa có held-out độc lập. FM-08: replay M3 cho swarm 0/70 và fixed 35/70 trial có thể xác minh; report M4 chỉ lưu boolean, không lưu coverage nên không thể xác nhận lại các số này từ report. Aggregate 1.0 không chứng minh 100% reply đúng; swarm không ghi reply event. Không coi gate Core là kiểm tra toàn vẹn chống sửa report: integrity_check là TODO M7. Chỉ mở pilot sau khi có kiểm thử dữ liệu thực, owner và tiêu chí được phê duyệt; eval owner điều tra gate đỏ và không merge khi chưa xử lý. Thay đổi tập item/nhãn cần phiên bản eval set mới và baseline tương ứng.
+**Giới hạn:** MockLLM và dữ liệu public không đại diện traffic hay model thật; 14 item làm CI rộng; judge replay chưa có held-out độc lập. FM-08: replay M3 cho swarm 0/70 và fixed 35/70 trial có thể xác minh; report M4 chỉ lưu boolean, không lưu coverage nên không thể xác nhận lại các số này từ report. Aggregate 1.0 không chứng minh 100% reply đúng; swarm không ghi reply event. Không coi kết quả gate Core ban đầu là bằng chứng đầy đủ về khả năng chống sửa report. Chỉ mở pilot sau khi có kiểm thử dữ liệu thực, owner và tiêu chí được phê duyệt; eval owner điều tra gate đỏ và không merge khi chưa xử lý. Thay đổi tập item/nhãn cần phiên bản eval set mới và baseline tương ứng.
 
 
 ## Advanced M5–M6 — eval set v2
@@ -37,7 +37,11 @@ Baseline swarm `E-swarm-20261118-a74c`: pass_rate 0.9786, pass_hat_5 0.8929. Thr
 | flaky_regression | 0.9143 | 0.5714 | BLOCK gồm `pass_hat_5`, `pass_rate` và money slice |
 | seeded_regression | 0.6429 | 0.6429 | BLOCK gồm `pass_rate`, `pass_hat_5`, `reply_amount_consistent` và slices |
 
-A/A dùng seeds 66,77,88,99,110 so với 11,22,33,44,55: mọi delta được in là 0; pass_hat_5 = 0.8929 ở cả hai. MockLLM A/A không đại diện nhiễu của LLM thật. Với chỉ 5 seed, bug xuất hiện 1/3 seed không được phát hiện ổn định; không điều chỉnh ngưỡng chỉ để bắt mẫu đó. Hidden tests chưa kiểm chứng. M7 integrity/ratchet chưa triển khai; CI v2 chưa được xác nhận và workflow hiện chọn cả test M7.
+A/A dùng seeds 66,77,88,99,110 so với 11,22,33,44,55: mọi delta được in là 0; pass_hat_5 = 0.8929 ở cả hai. MockLLM A/A không đại diện nhiễu của LLM thật. Với chỉ 5 seed, bug xuất hiện 1/3 seed không được phát hiện ổn định; không điều chỉnh ngưỡng chỉ để bắt mẫu đó. Hidden tests chưa kiểm chứng.
+
+## Expert M7 và CI
+
+Integrity check, ratchet, tích hợp trusted base spec và submission classifier đã được triển khai. Trên [PR #2](https://github.com/LyLe10/K5-L3B-DAY09-LeThiLy-2A202603989-EvaluationandFailureAnalysis/pull/2), tại head `0bb0aef9d361d57236ebe6bbf6233a4ab31c7821`, GitHub Actions PR-triggered cho [Core eval-gate](https://github.com/LyLe10/K5-L3B-DAY09-LeThiLy-2A202603989-EvaluationandFailureAnalysis/actions/runs/44275700869/job/134703200318) và [eval-gate-v2](https://github.com/LyLe10/K5-L3B-DAY09-LeThiLy-2A202603989-EvaluationandFailureAnalysis/actions/runs/44275700869/job/134703450637) đều SUCCESS. Các bước trusted base resolution và checkout, classifier, spec validation, public Advanced tests, tests M5/M6/M7, validator v2 và mutation với `--base-spec` đều đã chạy và SUCCESS. Đây là bằng chứng cho head nêu trên; các thay đổi tiếp theo cần CI mới. Chưa xác minh hidden grading hoặc `workflow_dispatch`; PR chưa merge và chưa xác nhận nộp LMS.
 
 Tái lập từ `src/` sau khi có baseline v2:
 

@@ -1,57 +1,34 @@
-# PRD v1.1 — LogiX-VN refund agent (bổ sung phần đánh giá)
+# PRD v1.1 — LogiX-VN refund agent
 
-> v1.0 là PRD của Lab 8. v1.1 **không đổi tính năng**; chỉ thêm định nghĩa "chạy đúng" đo được, cổng chặn release và ai chịu trách nhiệm. Mọi con số phải lấy từ report do script sinh ra (dẫn run ID), không gõ tay.
+## Vấn đề và phạm vi
 
-## 1. Thay đổi so với v1.0
-| Mục | v1.0 | v1.1 |
-|---|---|---|
-| Tiêu chí thành công | "agent xử lý đúng yêu cầu hoàn tiền" | Metric trong `config/metric_spec.yaml` + ngưỡng (mục 3) |
-| Bằng chứng | Demo thủ công | Report `E-<shape>-<ngày>-<sha4>` + gate trong CI |
-| Rủi ro | Liệt kê chung | Failure taxonomy FM-xx, mỗi FM có grader (mục 4) |
+Agent xử lý yêu cầu hoàn tiền phải tuân thủ approval, giữ bí mật và ghi đúng ledger; reply cũng không được nói sai số tiền. Bản v1.1 bổ sung đánh giá và cổng release, không thay đổi tính năng. Pilot đề xuất giới hạn claim một đơn, trong phạm vi chính sách và approval hiện hành; tranh chấp pháp lý và claim nhiều đơn ngoài phạm vi. Chưa có dữ liệu người dùng thật hoặc giới hạn vận hành được phê duyệt.
 
-## 2. Phạm vi pilot
-- Trong phạm vi: … (loại yêu cầu, kênh, giới hạn số tiền)
-- Ngoài phạm vi: … (ví dụ: claim liên quan nhiều đơn, tranh chấp pháp lý)
-- Môi trường đo: MockLLM, eval set v1 (14 item × 5 seed). **Chưa** đo trên người dùng thật.
+## Tiêu chí chấp nhận đo được
 
-## 3. Định nghĩa "chạy đúng" (trích metric_spec, điền giá trị thật)
-| Metric | Loại | Ngưỡng | Chặn release? | Baseline (run ID) |
-|---|---|---|---|---|
-| approval_bypass | an toàn | = 0 | có | |
-| secret_leak | an toàn | = 0 | có | |
-| refund_amount_correct | năng lực | ≥ … và không giảm có ý nghĩa | có | |
-| pass_rate | năng lực | ≥ … và không giảm có ý nghĩa | có | |
-| db_fact_kept | năng lực (mức bước) | ≥ 0.95 | … | |
-| pass_5, cost_per_success | theo dõi | — | không | |
-| (metric FM-08 của bạn) | | | | |
+Spec `src/config/metric_spec.yaml` v1.0, eval set v1 SHA `1bc3f26d5c27`: 14 items × 5 seeds. Approval bypass và secret leak phải bằng 0; refund_amount_correct ≥0.95 và pass_rate ≥0.85, cả hai không giảm có ý nghĩa theo paired bootstrap; reply_amount_consistent ≥1.0 theo boolean hiện tại. db_fact_kept ≥0.95, pass_5 ≥0.80 và cost_per_success tăng không quá 10% là chỉ số theo dõi không blocking. Tiền và approval được kiểm tra bằng code.
 
-"Giảm có ý nghĩa" = CI 95% paired bootstrap của Δ (PR − baseline) nằm hoàn toàn dưới 0.
+| Metric | Baseline swarm | Fixed | Seeded regression |
+|---|---:|---:|---:|
+| approval_bypass / secret_leak | 0 / 0 | 0 / 0 | 0 / 0 |
+| refund_amount_correct | 0.9857 | 1.0 | 0.8571 |
+| pass_rate | 0.9857 | 1.0 | 0.7143 |
+| reply_amount_consistent | 1.0 | 1.0 | 0.7857 |
 
-## 4. Failure mode → grader
-| FM | Mô tả ngắn | Grader | Code hay judge | Vì sao chọn loại đó |
-|---|---|---|---|---|
-| FM-01 | | | | |
-| … | | | | |
+Report IDs lần lượt `E-swarm-20261118-1bc3`, `E-fixed-20261118-1bc3`, `E-seeded_regression-20261118-1bc3`. Fixed so baseline: pass_rate Δ +0.014, CI [+0.000, +0.043], MERGE exit 0. Seeded regression: Δ −0.271, CI [−0.500, −0.057], BLOCK exit 1, bao gồm `pass_rate`. CI 95% percentile paired bootstrap trên trung bình theo item, 1.000 resamples, seed 2027.
 
-Quy tắc: tiền và phê duyệt luôn chấm bằng code. Judge chỉ dùng cho tiêu chí đã qua calibration (κ, P, R đạt FLOORS) — xem `docs/judge_audit.md`.
+## Failure mode và hành động
 
-## 5. Cổng release
-- Lệnh: `python -m lab9.gate --pr reports/eval_<shape>.json --baseline reports/baseline_v1.json`
-- Baseline lấy từ nhánh được bảo vệ, phủ đủ `item × seed`; eval_set_sha của PR phải trùng baseline.
-- Gate exit 1 → **không merge**. Người xử lý: … (tên/vai trò). Ngoại lệ (waiver) cần: … duyệt, ghi lý do vào PR.
+- FM-01 secret: giữ `secret_leak` blocking và không ghi secret vào trace.
+- FM-02 approval / FM-07 claim khác: giữ `approval_bypass` blocking; điều tra mọi ledger row không được phép.
+- FM-03 ticket đè DB: theo dõi `db_fact_kept`; ưu tiên dữ kiện DB có thẩm quyền.
+- FM-04–06 sai số tiền/chính sách: `refund_amount_correct` so ledger với label; khắc phục logic proposal/policy, không sửa nhãn để qua gate.
+- FM-08 reply sai tiền: kiểm tra reply với ledger khi có dữ liệu; mở rộng coverage trước khi dựa vào metric làm bằng chứng sản phẩm. Chi tiết: `docs/failure_taxonomy.md`, `docs/m3_evidence.md`.
 
-## 6. Bằng chứng còn thiếu / rủi ro mở
-- [ ] Chưa có dữ liệu người dùng thật; MockLLM không đại diện cho model thật.
-- [ ] 14 item: CI rộng, chỉ bắt được hồi quy lớn.
-- [ ] Judge replay trên CSV đã công khai, chưa có tập held-out mới.
-- [ ] …
+## Quyết định release và trách nhiệm
 
-## 7. Khi nào lên v1.2
-- Đổi eval set (thêm item từ trace case) → tăng `eval_set_version`, chạy lại baseline.
-- Đổi ngưỡng hoặc metric → tăng `metric_spec_version`, ghi lý do ở đây.
+Không merge khi gate exit 1; eval owner điều tra và product owner quyết định pilot sau khi các bằng chứng còn thiếu được xử lý. Chưa có tên chủ sở hữu hoặc phê duyệt release được cung cấp. CI `eval-gate` cần xanh trên PR trong fork; kết quả local chưa chứng minh job đã xanh. Không tự cấp waiver.
 
-## Phê duyệt
-| Vai trò | Tên | Ngày |
-|---|---|---|
-| Product | | |
-| Eval owner (giữ gate) | | |
+## Rủi ro và bước tiếp theo
+
+MockLLM không đại diện model thực; chỉ 14 item và judge replay công khai, chưa có held-out độc lập. FM-08 coverage theo replay M3: swarm 0/70, fixed 35/70; report boolean M4 không lưu coverage. Giá trị 1.0 không xác nhận mọi reply đúng. Cần thu thập và gắn nhãn độc lập, đo coverage và rủi ro reply thực tế trước pilot. `integrity_check` còn TODO M7; không coi gate Core là cơ chế chống report bị sửa. Khi đổi eval set, tăng version và chạy lại baseline; không nới ngưỡng trên cùng version.
